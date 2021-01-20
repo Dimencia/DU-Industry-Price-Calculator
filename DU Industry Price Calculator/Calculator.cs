@@ -95,7 +95,7 @@ namespace DU_Industry_Price_Calculator
                     // If we were going to get an exception from this we already did, so, no need to slow it down with a try/catch this time
                     var talentTotals = getOreTotals(recipe, true);
 
-                    if (recipe.Type == "Ore" || recipe.Name == "Hydrogen Pure" || recipe.Name == "Oxygen Pure")
+                    if (recipe.Type == "Ore" || recipe.Name == "Hydrogen Pure" || recipe.Name == "Oxygen Pure") // The gases sure don't go in the second half, and might as well put them here in case there's an apocalypse and one day you have to buy them or something
                     {
                         worksheet.Cell(row, 1).Value = name;
                         worksheet.Cell(row, 2).Value = recipe.Price;
