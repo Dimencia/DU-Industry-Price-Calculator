@@ -25,13 +25,11 @@ namespace DU_Industry_Price_Calculator
          * Then, we must input ore prices for all basic ores
          * 
          * It then should iterate through all recipes, calculating the Price To Make if you bought ores form the market, and processed it all with or without full talents
-         * You can then select items one at a time, check their market sell price, and see if they're profitable
-         * 
-         * We can also export market prices from Hyperion, though idk how accurate they are
+         * We then output all that information to a spreadsheet
          * */
 
-        private Dictionary<string, Recipe> _recipes;
-        private List<string> missing_recipes = new List<string>();
+        private Dictionary<string, Recipe> _recipes; // Global list of all our recipes, from the json
+        private List<string> missing_recipes = new List<string>(); // Used to report any errors from missing recipes
 
         public Calculator()
         {
@@ -43,9 +41,7 @@ namespace DU_Industry_Price_Calculator
             // Alright, so now iterate all recipes and calculate the Price To Make
             // And I guess, just list them all, except the stupid honeycombs if they're even included
 
-
-            // Right so, turns out putting all these on a winform is, obviously, too much.
-            // We'll put them in an excel sheet in the same way
+            // I don't think they are.
 
             using (var workbook = new XLWorkbook())
             {
@@ -73,24 +69,18 @@ namespace DU_Industry_Price_Calculator
                 talentHeader.Style.Border.BottomBorder = XLBorderStyleValues.Medium;
 
 
-                int row = 2;
+                int row = 2; // Start after the header
 
-                // Let's list all the Types just for posterity too
-                List<string> types = new List<string>();
-
-                // The ores are first, we will store their cell positions
+                // The ores are first when we iterate, we will store their cell positions for reference in formulas later
                 Dictionary<string, string> oreCells = new Dictionary<string, string>();
 
-                int lastOreRow = -1;
+                int lastOreRow = -1; // Just to flag that it's unset.  TBH 0 would be fine but it feels wrong
                 int numProcessed = 0;
 
-                foreach (var kvp in _recipes)
+                foreach (var recipekvp in _recipes)
                 {
-                    string key = kvp.Key;
-                    var recipe = kvp.Value;
-
-                    if (!types.Contains(recipe.Type))
-                        types.Add(recipe.Type);
+                    string name = recipekvp.Key; // Just for easier reference
+                    var recipe = recipekvp.Value;
 
                     Dictionary<string, double> oreTotals;
                     try
@@ -99,7 +89,7 @@ namespace DU_Industry_Price_Calculator
                     }
                     catch (Exception)
                     {
-                        // Had some issues with missing recipes, don't list it
+                        // Had missing recipes, skip this recipe entirely, we'll list the problem later in the Missing Recipes tab
                         continue;
                     }
                     // If we were going to get an exception from this we already did, so, no need to slow it down with a try/catch this time
@@ -107,17 +97,17 @@ namespace DU_Industry_Price_Calculator
 
                     if (recipe.Type == "Ore" || recipe.Name == "Hydrogen Pure" || recipe.Name == "Oxygen Pure")
                     {
-                        worksheet.Cell(row, 1).Value = kvp.Key;
-                        worksheet.Cell(row, 2).Value = kvp.Value.Price;
+                        worksheet.Cell(row, 1).Value = name;
+                        worksheet.Cell(row, 2).Value = recipe.Price;
                         worksheet.Cell(row, 1).Style.Font.SetBold();
                         worksheet.Cell(row, 2).Style.Font.SetBold();
 
-                        talentSheet.Cell(row, 1).Value = kvp.Key;
-                        talentSheet.Cell(row, 2).Value = kvp.Value.Price;
+                        talentSheet.Cell(row, 1).Value = name;
+                        talentSheet.Cell(row, 2).Value = recipe.Price;
                         talentSheet.Cell(row, 1).Style.Font.SetBold();
                         talentSheet.Cell(row, 2).Style.Font.SetBold();
 
-                        oreCells[kvp.Key] = "B" + row;
+                        oreCells[name] = "B" + row; // Store the cell location in a dictionary by name
                         worksheet.Cell(row, 2).Style.Fill.BackgroundColor = XLColor.AliceBlue; // Indicate that these cells are changeable
                         talentSheet.Cell(row, 2).Style.Fill.BackgroundColor = XLColor.AliceBlue;
                         row++;
@@ -126,24 +116,22 @@ namespace DU_Industry_Price_Calculator
                     {
                         if (lastOreRow == -1) // if this is the first non-ore, finish out the Ore section and add a few rows of space
                         {
-                            worksheet.Range(row-1, 1, row-1, 7).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
+                            worksheet.Range(row-1, 1, row-1, 7).Style.Border.BottomBorder = XLBorderStyleValues.Thin; // I magically know that 7 is the highest column... TODO: remove magic
                             talentSheet.Range(row - 1, 1, row - 1, 7).Style.Border.BottomBorder = XLBorderStyleValues.Thin;
                             lastOreRow = row;
                             row+=3;
                         }
 
-                        worksheet.Cell(row, 1).Value = kvp.Key;
-                        // We no longer pre-calculate prices, the excel sheet can do that - formulas get added after we iterate the ores
-                        //worksheet.Cell(row, 2).Value = kvp.Value.PriceToMake;
+                        worksheet.Cell(row, 1).Value = name;
+                        // The cell at row,2 gets populated by a formula, after we iterate the ores and determine the range over which we should SUM
                         worksheet.Cell(row, 1).Style.Font.SetBold();
                         worksheet.Cell(row, 2).Style.Font.SetBold();
 
-                        talentSheet.Cell(row, 1).Value = kvp.Key;
-                        //talentSheet.Cell(row, 2).Value = kvp.Value.PriceToMakeWithTalents;
+                        talentSheet.Cell(row, 1).Value = name;
                         talentSheet.Cell(row, 1).Style.Font.SetBold();
                         talentSheet.Cell(row, 2).Style.Font.SetBold();
 
-                        int startRow = row;
+                        int startRow = row; // Track the first row so we can put borders around the whole thing
                         row++;
                         // List the ores
                         foreach (var orekvp in oreTotals)
@@ -151,7 +139,7 @@ namespace DU_Industry_Price_Calculator
                             worksheet.Cell(row, 4).Value = orekvp.Key;
                             worksheet.Cell(row, 5).Value = orekvp.Value; // Amount Required, E
                             worksheet.Cell(row, 6).FormulaA1 = "=" + oreCells[orekvp.Key];
-                            worksheet.Cell(row, 7).FormulaA1 = "=" + oreCells[orekvp.Key] + "*E" + row;
+                            worksheet.Cell(row, 7).FormulaA1 = "=" + oreCells[orekvp.Key] + "*E" + row; // Amount Required * Price Per Unit
 
                             talentSheet.Cell(row, 4).Value = orekvp.Key;
                             talentSheet.Cell(row, 5).Value = talentTotals[orekvp.Key];
@@ -161,16 +149,16 @@ namespace DU_Industry_Price_Calculator
                         }
                         worksheet.Range(startRow, 1, row - 1, 7).Style.Border.OutsideBorder = XLBorderStyleValues.Double;
                         talentSheet.Range(startRow, 1, row - 1, 7).Style.Border.OutsideBorder = XLBorderStyleValues.Double;
-                        if (numProcessed % 2 == 0)
+                        if (numProcessed % 2 == 0) // Make the recipes have alternating colors for easier reading
                         {
                             worksheet.Range(startRow, 1, row - 1, 7).Style.Fill.BackgroundColor = XLColor.FloralWhite;
                             talentSheet.Range(startRow, 1, row - 1, 7).Style.Fill.BackgroundColor = XLColor.FloralWhite;
                         }
-                        // Replace the Price To Make with the calculated values now that we know what range to sum over
+                        // Set the formulas for PriceToMake - the sum of all prices of the constituent ores
                         worksheet.Cell(startRow, 2).FormulaA1 = "=SUM(G" + (startRow + 1) + ":G" + (row - 1) + ")";
                         talentSheet.Cell(startRow, 2).FormulaA1 = "=SUM(G" + (startRow + 1) + ":G" + (row - 1) + ")";
                     }
-                    numProcessed++;
+                    numProcessed++; // This is just to help determine 'alternating' recipes for the background colors
                     Console.WriteLine($"Finished {recipe.Name}");
                 }
                 worksheet.ColumnsUsed().AdjustToContents();
@@ -198,9 +186,10 @@ namespace DU_Industry_Price_Calculator
            
         }
 
+        // This function was kindof a nightmare to get the logic right so I had to step through piece by piece
         private Dictionary<string, double> getOreTotals(Recipe recipe, bool assumeTalents = false)
         {
-            var result = new Dictionary<string, double>(); // Run through of Nitron.
+            var result = new Dictionary<string, double>(); // Example step through of Nitron.
             var numPerRecipe = recipe.OutputQuantity; // 100 Quantity
             var costMultiplier = 1d;
             if (assumeTalents && (recipe.Type == "Fuel" || recipe.Type == "Product" || recipe.Type == "Pure" || recipe.Type == "Scrap" || recipe.Type.Contains("Ammo")))
@@ -209,14 +198,14 @@ namespace DU_Industry_Price_Calculator
                 if (recipe.Type != "Fuel")
                     costMultiplier = 0.85d; // 15% less costs with talents
                 else
-                    costMultiplier = 0.75d; // Fuel gets -10% generic and -15% specific for costs
+                    costMultiplier = 0.75d; // Fuel gets -10% generic and -15% specific for costs, so only costs 75%
             }
             else if (assumeTalents && recipe.Type == "Intermediary Part")
             {
                 numPerRecipe += 5; // Intermediate parts of all tiers can be given up to a flat +5 to outputs, but can't have reduced inputs 
             }
 
-            foreach (KeyValuePair<string,double> input in recipe.Input) // Specifying since it's not clear
+            foreach (KeyValuePair<string,double> input in recipe.Input)
             {
                 if (!_recipes.ContainsKey(input.Key))
                 {
