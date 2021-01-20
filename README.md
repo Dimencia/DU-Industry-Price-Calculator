@@ -11,7 +11,7 @@ You can edit the ore prices to match current market values and everything will u
 
 
 
-If you'd like to help with this, we could use all the new recipes in JSON format, matching the format of recipes_object_version.json
+### If you'd like to help with this, we could use all the new recipes in JSON format, matching the format of recipes_object_version.json
 
 We don't actually care about the Time field and I don't know how you get it.  Also, Price, PriceToMake, and PriceToMakeWithTalents are obsolete... I didn't mean to leave the last two in that json.  But Price is also only really applicable to Ores.  You can fill it in if you want but I don't think I'll ever use it, it would change too rapidly
 
